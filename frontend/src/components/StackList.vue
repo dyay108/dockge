@@ -61,9 +61,7 @@
                         <font-awesome-icon v-show="!closedAgents.get(agent.endpoint)" icon="chevron-circle-down" />
                     </span>
                     <span v-if="agent.endpoint === 'current'">{{ $t("currentEndpoint") }}</span>
-                    <span v-else>
-                        {{ $root.endpointDisplayFunction(agent.endpoint) || agent.endpoint }}
-                    </span>
+                    <span v-else>{{ agent.displayName }}</span>
                 </div>
                 <StackListItem
                     v-for="(item, index) in agent.stacks"
@@ -205,26 +203,28 @@ export default {
 
             // Group stacks by endpoint, sorting them so the local endpoint is first
             // and the rest are sorted alphabetically
-            result = [
-                ...result.reduce((acc, stack) => {
-                    const endpoint = stack.endpoint || "current";
-                    if (!acc.has(endpoint)) {
-                        acc.set(endpoint, []);
+            return Object.entries(groupedByAgent)
+                .map(([ endpoint, stacks ]) => ({
+                    endpoint,
+                    displayName: endpoint === "current"
+                        ? this.$t("currentEndpoint")
+                        : this.$root.endpointDisplayFunction(endpoint) || endpoint,
+                    stacks,
+                }))
+                .sort((a, b) => {
+                    if (a.endpoint === "current") {
+                        return -1;
                     }
-                    acc.get(endpoint).push(stack);
-                    return acc;
-                }, new Map()).entries()
-            ].map(([ endpoint, stacks ]) => ({
-                endpoint,
-                stacks
-            })).sort((a, b) => {
-                if (a.endpoint === "current" && b.endpoint !== "current") {
-                    return -1;
-                } else if (a.endpoint !== "current" && b.endpoint === "current") {
-                    return 1;
-                }
-                return a.endpoint.localeCompare(b.endpoint);
-            });
+            
+                    if (b.endpoint === "current") {
+                        return 1;
+                    }
+            
+                    return a.displayName.localeCompare(b.displayName, undefined, {
+                        sensitivity: "base",
+                        numeric: true,
+                    });
+                });
 
             return result;
         },
