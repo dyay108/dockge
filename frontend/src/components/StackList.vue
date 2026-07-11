@@ -61,7 +61,9 @@
                         <font-awesome-icon v-show="!closedAgents.get(agent.endpoint)" icon="chevron-circle-down" />
                     </span>
                     <span v-if="agent.endpoint === 'current'">{{ $t("currentEndpoint") }}</span>
-                    <span v-else>{{ agent.displayName }}</span>
+                    <span v-else>
+                        {{ $root.endpointDisplayFunction(agent.endpoint) || agent.endpoint }}
+                    </span>
                 </div>
                 <StackListItem
                     v-for="(item, index) in agent.stacks"
@@ -203,28 +205,27 @@ export default {
 
             // Group stacks by endpoint, sorting them so the local endpoint is first
             // and the rest are sorted alphabetically
-            return Object.entries(groupedByAgent)
-                .map(([ endpoint, stacks ]) => ({
-                    endpoint,
-                    displayName: endpoint === "current"
-                        ? this.$t("currentEndpoint")
-                        : this.$root.endpointDisplayFunction(endpoint) || endpoint,
-                    stacks,
-                }))
-                .sort((a, b) => {
-                    if (a.endpoint === "current") {
-                        return -1;
+            result = [
+                ...result.reduce((acc, stack) => {
+                    const endpoint = stack.endpoint || "current";
+                    if (!acc.has(endpoint)) {
+                        acc.set(endpoint, []);
                     }
-            
-                    if (b.endpoint === "current") {
-                        return 1;
-                    }
-            
-                    return a.displayName.localeCompare(b.displayName, undefined, {
-                        sensitivity: "base",
-                        numeric: true,
-                    });
-                });
+                    acc.get(endpoint).push(stack);
+                    return acc;
+                }, new Map()).entries()
+            ].map(([ endpoint, stacks ]) => ({
+                endpoint,
+                displayName: this.$root.endpointDisplayFunction(endpoint) || endpoint,
+                stacks
+            })).sort((a, b) => {
+                if (a.endpoint === "current" && b.endpoint !== "current") {
+                    return -1;
+                } else if (a.endpoint !== "current" && b.endpoint === "current") {
+                    return 1;
+                }
+                return String(a.displayName).localeCompare(String(b.displayName), undefined, { sensitivity: "base", numeric: true });
+            });
 
             return result;
         },
@@ -260,14 +261,15 @@ export default {
     },
     watch: {
         searchText() {
-            for (let stack of this.agentStackList) {
-                if (!this.selectedStacks[stack.id]) {
-                    if (this.selectAll) {
-                        this.disableSelectAllWatcher = true;
-                        this.selectAll = false;
-                    }
-                    break;
-                }
+            if (!this.selectAll) {
+                return;
+            }
+            const allVisibleStacksSelected = this.agentStackList.every(agent =>
+                agent.stacks.every(stack => this.selectedStacks[stack.id])
+            );
+            if (!allVisibleStacksSelected) {
+                this.disableSelectAllWatcher = true;
+                this.selectAll = false;
             }
         },
         selectAll() {
@@ -275,8 +277,10 @@ export default {
                 this.selectedStacks = {};
 
                 if (this.selectAll) {
-                    this.agentStackList.forEach((item) => {
-                        this.selectedStacks[item.id] = true;
+                    this.agentStackList.forEach(agent => {
+                        agent.stacks.forEach(stack => {
+                            this.selectedStacks[stack.id] = true;
+                        });
                     });
                 }
             } else {
