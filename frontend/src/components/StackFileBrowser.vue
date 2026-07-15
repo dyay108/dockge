@@ -1,10 +1,5 @@
 <template>
     <section class="shadow-box big-padding mb-3 stack-file-browser">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-            <h4 class="mb-0">{{ $t("stackFiles") }}</h4>
-            <span class="text-muted small">{{ stackName }}</span>
-        </div>
-
         <nav :aria-label="$t('currentDirectory')" class="file-breadcrumb mb-3">
             <button class="breadcrumb-part" type="button" @click="openDirectory('')">
                 <font-awesome-icon icon="folder-open" class="me-1" />
@@ -268,6 +263,7 @@ export default {
 @import "../styles/vars.scss";
 
 .stack-file-browser {
+    container-type: inline-size;
     overflow: hidden;
 }
 
@@ -432,6 +428,32 @@ export default {
 }
 
 @media (max-width: 767px) {
+    .file-list-pane {
+        border-bottom: 1px solid #dee2e6;
+        border-right: 0;
+        max-height: 260px;
+
+        .dark & {
+            border-color: $dark-border-color;
+        }
+    }
+
+    .editor-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+@container (max-width: 620px) {
+    .browser-content {
+        display: block;
+    }
+
+    .file-list-pane,
+    .editor-pane {
+        width: 100%;
+    }
+
     .file-list-pane {
         border-bottom: 1px solid #dee2e6;
         border-right: 0;

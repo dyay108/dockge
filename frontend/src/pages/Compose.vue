@@ -55,13 +55,6 @@
                 </div>
 
                 <button v-if="isEditMode && !isAdd" class="btn btn-normal" :disabled="processing" @click="discardStack">{{ $t("discardStack") }}</button>
-                <button
-                    v-if="!isEditMode && !isAdd" class="btn btn-normal me-2" :class="{ active: showFileBrowser }"
-                    :disabled="processing" @click="toggleFileBrowser"
-                >
-                    <font-awesome-icon icon="folder-open" class="me-1" />
-                    {{ $t("stackFiles") }}
-                </button>
                 <button v-if="!isEditMode" class="btn btn-danger" :disabled="processing" @click="showDeleteDialog = !showDeleteDialog">
                     <font-awesome-icon icon="trash" class="me-1" />
                     {{ $t("deleteStack") }}
@@ -74,11 +67,6 @@
                     <span class="badge bg-secondary me-2">{{ urlItem.display }}</span>
                 </a>
             </div>
-
-            <StackFileBrowser
-                v-if="fileBrowserOpened && !isAdd" v-show="showFileBrowser" :stackName="stack.name" :endpoint="endpoint"
-                @dirty-change="fileBrowserDirty = $event" @saved="onStackFileSaved"
-            />
 
             <!-- Progress Terminal -->
             <transition name="slide-fade" appear>
@@ -179,35 +167,38 @@
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <h4 class="mb-3">{{ stack.composeFileName }}</h4>
-
-                    <!-- YAML editor -->
-                    <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
-                        <code-mirror
-                            ref="editor"
-                            v-model="stack.composeYAML"
-                            :extensions="extensions"
-                            minimal
-                            wrap="true"
-                            dark="true"
-                            tab="true"
-                            :disabled="!isEditMode"
-                            :hasFocus="editorFocus"
-                            @change="yamlCodeChange"
-                        />
+                    <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+                        <h4 class="mb-0">{{ showFileBrowser ? $t("stackFiles") : stack.composeFileName }}</h4>
+                        <div
+                            v-if="!isAdd && !isEditMode" class="editor-view-toggle"
+                            :title="$t('editorViewDescription')"
+                        >
+                            <label class="form-check-label" for="editor-view-toggle">
+                                {{ $t("workspace") }}
+                                <span v-if="fileBrowserDirty" class="unsaved-indicator" aria-hidden="true"></span>
+                            </label>
+                            <div class="form-check form-switch m-0">
+                                <input
+                                    id="editor-view-toggle" class="form-check-input" type="checkbox" role="switch"
+                                    :checked="showFileBrowser" :aria-label="$t('editorViewDescription')"
+                                    @change="toggleFileBrowser"
+                                />
+                            </div>
+                        </div>
                     </div>
-                    <div v-if="isEditMode" class="mb-3">
-                        {{ yamlError }}
-                    </div>
 
-                    <!-- ENV editor -->
-                    <div v-if="isEditMode">
-                        <h4 class="mb-3">.env</h4>
+                    <StackFileBrowser
+                        v-if="fileBrowserOpened && !isAdd" v-show="showFileBrowser" :stackName="stack.name" :endpoint="endpoint"
+                        @dirty-change="fileBrowserDirty = $event" @saved="onStackFileSaved"
+                    />
+
+                    <div v-show="!showFileBrowser">
+                        <!-- YAML editor -->
                         <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
                             <code-mirror
                                 ref="editor"
-                                v-model="stack.composeENV"
-                                :extensions="extensionsEnv"
+                                v-model="stack.composeYAML"
+                                :extensions="extensions"
                                 minimal
                                 wrap="true"
                                 dark="true"
@@ -217,31 +208,53 @@
                                 @change="yamlCodeChange"
                             />
                         </div>
-                    </div>
+                        <div v-if="isEditMode" class="mb-3">
+                            {{ yamlError }}
+                        </div>
 
-                    <div v-if="isEditMode">
-                        <!-- Volumes -->
-                        <div v-if="false">
-                            <h4 class="mb-3">{{ $tc("volume", 2) }}</h4>
-                            <div class="shadow-box big-padding mb-3">
+                        <!-- ENV editor -->
+                        <div v-if="isEditMode">
+                            <h4 class="mb-3">.env</h4>
+                            <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
+                                <code-mirror
+                                    ref="editor"
+                                    v-model="stack.composeENV"
+                                    :extensions="extensionsEnv"
+                                    minimal
+                                    wrap="true"
+                                    dark="true"
+                                    tab="true"
+                                    :disabled="!isEditMode"
+                                    :hasFocus="editorFocus"
+                                    @change="yamlCodeChange"
+                                />
                             </div>
                         </div>
 
-                        <!-- Networks -->
-                        <h4 class="mb-3">{{ $tc("network", 2) }}</h4>
-                        <div class="shadow-box big-padding mb-3">
-                            <NetworkInput />
+                        <div v-if="isEditMode">
+                            <!-- Volumes -->
+                            <div v-if="false">
+                                <h4 class="mb-3">{{ $tc("volume", 2) }}</h4>
+                                <div class="shadow-box big-padding mb-3">
+                                </div>
+                            </div>
+
+                            <!-- Networks -->
+                            <h4 class="mb-3">{{ $tc("network", 2) }}</h4>
+                            <div class="shadow-box big-padding mb-3">
+                                <NetworkInput />
+                            </div>
                         </div>
+
+                        <!-- <div class="shadow-box big-padding mb-3">
+                            <div class="mb-3">
+                                <label for="name" class="form-label"> Search Templates</label>
+                                <input id="name" v-model="name" type="text" class="form-control" placeholder="Search..." required>
+                            </div>
+
+                            <prism-editor v-if="false" v-model="yamlConfig" class="yaml-editor" :highlight="highlighter" line-numbers @input="yamlCodeChange"></prism-editor>
+                        </div>-->
                     </div>
-
-                    <!-- <div class="shadow-box big-padding mb-3">
-                        <div class="mb-3">
-                            <label for="name" class="form-label"> Search Templates</label>
-                            <input id="name" v-model="name" type="text" class="form-control" placeholder="Search..." required>
-                        </div>
-
-                        <prism-editor v-if="false" v-model="yamlConfig" class="yaml-editor" :highlight="highlighter" line-numbers @input="yamlCodeChange"></prism-editor>
-                    </div>-->
                 </div>
             </div>
 
@@ -796,9 +809,11 @@ export default {
             this.isEditMode = true;
         },
 
-        toggleFileBrowser() {
-            this.fileBrowserOpened = true;
-            this.showFileBrowser = !this.showFileBrowser;
+        toggleFileBrowser(event) {
+            this.showFileBrowser = event.target.checked;
+            if (this.showFileBrowser) {
+                this.fileBrowserOpened = true;
+            }
         },
 
         onStackFileSaved(relativePath) {
@@ -896,5 +911,22 @@ export default {
 .agent-name {
     font-size: 13px;
     color: $dark-font-color3;
+}
+
+.editor-view-toggle {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+}
+
+.unsaved-indicator {
+    background-color: $primary;
+    border-radius: 50%;
+    display: inline-block;
+    height: 6px;
+    margin-left: 3px;
+    vertical-align: middle;
+    width: 6px;
 }
 </style>

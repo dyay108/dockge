@@ -123,6 +123,8 @@
     "updatedName": "New Dockge Agent Display name",
     "Saved": "Saved",
     "stackFiles": "Files",
+    "workspace": "Workspace",
+    "editorViewDescription": "Switch between the Compose editor and project file workspace.",
     "currentDirectory": "Current directory",
     "parentDirectory": "Parent directory",
     "emptyDirectory": "This directory is empty.",
