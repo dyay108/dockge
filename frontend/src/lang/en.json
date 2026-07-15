@@ -122,6 +122,14 @@
     "name": "Dockge Agent Display name",
     "updatedName": "New Dockge Agent Display name",
     "Saved": "Saved",
+    "stackFiles": "Files",
+    "currentDirectory": "Current directory",
+    "parentDirectory": "Parent directory",
+    "emptyDirectory": "This directory is empty.",
+    "selectFileToEdit": "Select a text file to view or edit.",
+    "reloadFile": "Reload",
+    "discardFileChanges": "Discard your unsaved file changes?",
+    "symlinkNotEditable": "Symbolic links cannot be opened.",
     "Deployed": "Deployed",
     "Deleted": "Deleted",
     "Updated": "Updated",
@@ -149,5 +157,6 @@
     "rmCode": "rm",
     "rmRfCode": "rm -rf",
     "envVarCode": "DOCKGE_ENABLE_CONSOLE=true",
-    "confirmLeaveStack": "You are currently editing a stack. Are you sure you want to leave?"
+    "confirmLeaveStack": "You are currently editing a stack. Are you sure you want to leave?",
+    "confirmLeaveWithUnsavedChanges": "You have unsaved changes. Are you sure you want to leave?"
 }

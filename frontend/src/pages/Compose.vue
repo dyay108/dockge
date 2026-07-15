@@ -55,6 +55,13 @@
                 </div>
 
                 <button v-if="isEditMode && !isAdd" class="btn btn-normal" :disabled="processing" @click="discardStack">{{ $t("discardStack") }}</button>
+                <button
+                    v-if="!isEditMode && !isAdd" class="btn btn-normal me-2" :class="{ active: showFileBrowser }"
+                    :disabled="processing" @click="toggleFileBrowser"
+                >
+                    <font-awesome-icon icon="folder-open" class="me-1" />
+                    {{ $t("stackFiles") }}
+                </button>
                 <button v-if="!isEditMode" class="btn btn-danger" :disabled="processing" @click="showDeleteDialog = !showDeleteDialog">
                     <font-awesome-icon icon="trash" class="me-1" />
                     {{ $t("deleteStack") }}
@@ -67,6 +74,11 @@
                     <span class="badge bg-secondary me-2">{{ urlItem.display }}</span>
                 </a>
             </div>
+
+            <StackFileBrowser
+                v-if="fileBrowserOpened && !isAdd" v-show="showFileBrowser" :stackName="stack.name" :endpoint="endpoint"
+                @dirty-change="fileBrowserDirty = $event" @saved="onStackFileSaved"
+            />
 
             <!-- Progress Terminal -->
             <transition name="slide-fade" appear>
@@ -265,6 +277,7 @@ import {
 } from "../../../common/util-common";
 import { BModal } from "bootstrap-vue-next";
 import NetworkInput from "../components/NetworkInput.vue";
+import StackFileBrowser from "../components/StackFileBrowser.vue";
 import dotenv from "dotenv";
 import { ref } from "vue";
 
@@ -286,6 +299,7 @@ let dockerStatsTimeout = null;
 export default {
     components: {
         NetworkInput,
+        StackFileBrowser,
         FontAwesomeIcon,
         CodeMirror,
         BModal,
@@ -341,6 +355,9 @@ export default {
             isEditMode: false,
             submitted: false,
             showDeleteDialog: false,
+            fileBrowserOpened: false,
+            showFileBrowser: false,
+            fileBrowserDirty: false,
             newContainerName: "",
             stopServiceStatusTimeout: false,
             stopDockerStatsTimeout: false,
@@ -558,8 +575,9 @@ export default {
         },
 
         exitConfirm(next) {
-            if (this.isEditMode) {
-                if (confirm(this.$t("confirmLeaveStack"))) {
+            if (this.isEditMode || this.fileBrowserDirty) {
+                const messageKey = this.fileBrowserDirty ? "confirmLeaveWithUnsavedChanges" : "confirmLeaveStack";
+                if (confirm(this.$t(messageKey))) {
                     this.exitAction();
                     next();
                 } else {
@@ -769,7 +787,24 @@ export default {
         },
 
         enableEditMode() {
+            if (this.fileBrowserDirty && !confirm(this.$t("discardFileChanges"))) {
+                return;
+            }
+            this.fileBrowserOpened = false;
+            this.showFileBrowser = false;
+            this.fileBrowserDirty = false;
             this.isEditMode = true;
+        },
+
+        toggleFileBrowser() {
+            this.fileBrowserOpened = true;
+            this.showFileBrowser = !this.showFileBrowser;
+        },
+
+        onStackFileSaved(relativePath) {
+            if (relativePath === this.stack.composeFileName || relativePath === ".env") {
+                this.loadStack();
+            }
         },
 
         checkYAML() {
