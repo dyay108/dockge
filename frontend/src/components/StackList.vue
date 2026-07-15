@@ -1,7 +1,7 @@
 <template>
     <div class="shadow-box mb-3" :style="boxStyle">
         <div class="list-header">
-            <div class="header-top">
+            <div class="header-top" :class="{ 'has-instance-selector': agentOptions.length > 1 }">
                 <!-- TODO -->
                 <button
                     v-if="false" class="btn btn-outline-normal ms-2" :class="{ 'active': selectMode }" type="button"
@@ -10,7 +10,18 @@
                     {{ $t("Select") }}
                 </button>
 
-                <div class="placeholder"></div>
+                <div v-if="agentOptions.length > 1" class="instance-selector">
+                    <label for="stack-list-instance" class="visually-hidden">{{ $tc("dockgeAgent", 1) }}</label>
+                    <select
+                        id="stack-list-instance" v-model="selectedEndpoint" class="form-select instance-select"
+                        :aria-label="$tc('dockgeAgent', 1)"
+                    >
+                        <option v-for="agent in agentOptions" :key="agent.endpoint" :value="agent.endpoint">
+                            {{ agent.displayName }}
+                        </option>
+                    </select>
+                </div>
+                <div v-else class="placeholder"></div>
                 <div class="search-wrapper">
                     <a v-if="searchText == ''" class="search-icon">
                         <font-awesome-icon icon="search" />
@@ -48,29 +59,14 @@
             </div>
         </div>
         <div ref="stackList" class="stack-list" :class="{ scrollbar: scrollbar }" :style="stackListStyle">
-            <div v-if="agentStackList[0] && agentStackList[0].stacks.length === 0" class="text-center mt-3">
-                <router-link to="/compose">{{ $t("addFirstStackMsg") }}</router-link>
+            <div v-if="filteredStackList.length === 0" class="text-center mt-3">
+                <span v-if="searchText">{{ $t("noMatchingStacks") }}</span>
+                <router-link v-else to="/compose">{{ $t("addFirstStackMsg") }}</router-link>
             </div>
-            <div v-for="(agent, agentIndex) in agentStackList" :key="agentIndex" class="stack-list-inner">
-                <div
-                    v-if="$root.agentCount > 1" class="p-2 agent-select"
-                    @click="closedAgents.set(agent.endpoint, !closedAgents.get(agent.endpoint))"
-                >
-                    <span class="me-1">
-                        <font-awesome-icon v-show="closedAgents.get(agent.endpoint)" icon="chevron-circle-right" />
-                        <font-awesome-icon v-show="!closedAgents.get(agent.endpoint)" icon="chevron-circle-down" />
-                    </span>
-                    <span v-if="agent.endpoint === 'current'">{{ $t("currentEndpoint") }}</span>
-                    <span v-else>
-                        {{ $root.endpointDisplayFunction(agent.endpoint) || agent.endpoint }}
-                    </span>
-                </div>
-                <StackListItem
-                    v-for="(item, index) in agent.stacks"
-                    v-show="$root.agentCount === 1 || !closedAgents.get(agent.endpoint)" :key="index" :stack="item" :isSelectMode="selectMode"
-                    :isSelected="isSelected" :select="select" :deselect="deselect"
-                />
-            </div>
+            <StackListItem
+                v-for="item in filteredStackList" :key="`${item.name}_${item.endpoint || ''}`" :stack="item"
+                :isSelectMode="selectMode" :isSelected="isSelected" :select="select" :deselect="deselect"
+            />
         </div>
     </div>
 
@@ -102,16 +98,40 @@ export default {
             selectAll: false,
             disableSelectAllWatcher: false,
             selectedStacks: {},
+            selectedEndpoint: "",
             windowTop: 0,
             filterState: {
                 status: null,
                 active: null,
                 tags: null,
             },
-            closedAgents: new Map(),
         };
     },
     computed: {
+        /**
+         * Returns the local and remote instances in display order.
+         * @returns {Array} The available Dockge instances.
+         */
+        agentOptions() {
+            return Object.entries(this.$root.agentList).map(([ endpoint, agent ]) => ({
+                endpoint,
+                displayName: endpoint === ""
+                    ? this.$t("currentEndpoint")
+                    : agent.name || endpoint,
+            })).sort((a, b) => {
+                if (a.endpoint === "") {
+                    return -1;
+                } else if (b.endpoint === "") {
+                    return 1;
+                }
+
+                return String(a.displayName).localeCompare(String(b.displayName), undefined, {
+                    sensitivity: "base",
+                    numeric: true,
+                });
+            });
+        },
+
         /**
          * Improve the sticky appearance of the list by increasing its
          * height as user scrolls down.
@@ -135,10 +155,14 @@ export default {
          * Returns a sorted list of stacks based on the applied filters and search text.
          * @returns {Array} The sorted list of stacks.
          */
-        agentStackList() {
+        filteredStackList() {
             let result = Object.values(this.$root.completeStackList);
 
             result = result.filter(stack => {
+                if ((stack.endpoint || "") !== this.selectedEndpoint) {
+                    return false;
+                }
+
                 // filter by search text
                 // finds stack name, tag name or tag value
                 let searchTextMatch = true;
@@ -203,30 +227,6 @@ export default {
                 return m1.name.localeCompare(m2.name);
             });
 
-            // Group stacks by endpoint, sorting them so the local endpoint is first
-            // and the rest are sorted alphabetically
-            result = [
-                ...result.reduce((acc, stack) => {
-                    const endpoint = stack.endpoint || "current";
-                    if (!acc.has(endpoint)) {
-                        acc.set(endpoint, []);
-                    }
-                    acc.get(endpoint).push(stack);
-                    return acc;
-                }, new Map()).entries()
-            ].map(([ endpoint, stacks ]) => ({
-                endpoint,
-                displayName: this.$root.endpointDisplayFunction(endpoint) || endpoint,
-                stacks
-            })).sort((a, b) => {
-                if (a.endpoint === "current" && b.endpoint !== "current") {
-                    return -1;
-                } else if (a.endpoint !== "current" && b.endpoint === "current") {
-                    return 1;
-                }
-                return String(a.displayName).localeCompare(String(b.displayName), undefined, { sensitivity: "base", numeric: true });
-            });
-
             return result;
         },
 
@@ -260,13 +260,19 @@ export default {
         }
     },
     watch: {
+        agentOptions(options) {
+            if (options.length > 0 && !options.some(agent => agent.endpoint === this.selectedEndpoint)) {
+                this.selectedEndpoint = "";
+            }
+        },
+        "$route.params.endpoint"() {
+            this.syncSelectedEndpointWithRoute();
+        },
         searchText() {
             if (!this.selectAll) {
                 return;
             }
-            const allVisibleStacksSelected = this.agentStackList.every(agent =>
-                agent.stacks.every(stack => this.selectedStacks[stack.id])
-            );
+            const allVisibleStacksSelected = this.filteredStackList.every(stack => this.selectedStacks[stack.id]);
             if (!allVisibleStacksSelected) {
                 this.disableSelectAllWatcher = true;
                 this.selectAll = false;
@@ -277,10 +283,8 @@ export default {
                 this.selectedStacks = {};
 
                 if (this.selectAll) {
-                    this.agentStackList.forEach(agent => {
-                        agent.stacks.forEach(stack => {
-                            this.selectedStacks[stack.id] = true;
-                        });
+                    this.filteredStackList.forEach(stack => {
+                        this.selectedStacks[stack.id] = true;
                     });
                 }
             } else {
@@ -295,12 +299,26 @@ export default {
         },
     },
     mounted() {
+        this.syncSelectedEndpointWithRoute();
         window.addEventListener("scroll", this.onScroll);
     },
     beforeUnmount() {
         window.removeEventListener("scroll", this.onScroll);
     },
     methods: {
+        /**
+         * Select the instance represented by the current stack route.
+         * @returns {void}
+         */
+        syncSelectedEndpointWithRoute() {
+            const endpoint = this.$route.params.endpoint;
+            if (typeof endpoint === "string") {
+                this.selectedEndpoint = endpoint;
+            } else if (this.$route.params.stackName) {
+                this.selectedEndpoint = "";
+            }
+        },
+
         /**
          * Handle user scroll
          * @returns {void}
@@ -424,6 +442,15 @@ export default {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
+
+    &.has-instance-selector {
+        .instance-selector,
+        .search-wrapper {
+            flex: 1 1 0;
+            min-width: 0;
+        }
+    }
 }
 
 .header-filter {
@@ -442,6 +469,11 @@ export default {
 .search-wrapper {
     display: flex;
     align-items: center;
+
+    form {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
 }
 
 .search-icon {
@@ -461,6 +493,13 @@ export default {
 
 .search-input {
     max-width: 15em;
+    width: 100%;
+}
+
+.instance-select {
+    font-size: 14px;
+    min-width: 0;
+    width: 100%;
 }
 
 .stack-item {
@@ -487,15 +526,4 @@ export default {
     gap: 10px;
 }
 
-.agent-select {
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    color: $dark-font-color3;
-    padding-left: 10px;
-    padding-right: 10px;
-    display: flex;
-    align-items: center;
-    user-select: none;
-}
 </style>
