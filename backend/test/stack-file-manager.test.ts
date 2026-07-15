@@ -54,8 +54,21 @@ test("StackFileManager safely lists, reads, and writes stack files", async (t) =
         );
     });
 
+    await t.test("creates empty files without overwriting existing paths", async () => {
+        const createdFile = await manager.createFile("config/new-file.yaml");
+        assert.equal(createdFile.path, path.join("config", "new-file.yaml"));
+        assert.equal(createdFile.content, "");
+        assert.equal(createdFile.size, 0);
+        assert.equal(await fs.readFile(path.join(stackPath, "config", "new-file.yaml"), "utf8"), "");
+
+        await assert.rejects(manager.createFile("config/new-file.yaml"), /already exists/);
+        await assert.rejects(manager.createFile("config"), /already exists/);
+    });
+
     await t.test("blocks traversal, binary files, and oversized files", async () => {
         await assert.rejects(manager.listDirectory(".."), /outside this stack/);
+        await assert.rejects(manager.createFile("../outside-created.txt"), /outside this stack/);
+        await assert.rejects(manager.createFile(""), /required/);
         await assert.rejects(manager.readFile("binary.dat"), /Binary files/);
         await assert.rejects(manager.readFile("large.txt"), /larger than 1 MiB/);
     });
@@ -64,6 +77,7 @@ test("StackFileManager safely lists, reads, and writes stack files", async (t) =
         await t.test("does not follow symbolic links", async () => {
             await fs.symlink(outsidePath, path.join(stackPath, "outside-link"));
             await assert.rejects(manager.readFile("outside-link"), /Symbolic links/);
+            await assert.rejects(manager.createFile("outside-link/new.txt"), /Symbolic links/);
         });
     }
 });

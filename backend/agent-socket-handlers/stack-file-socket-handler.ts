@@ -35,6 +35,22 @@ export class StackFileSocketHandler extends AgentSocketHandler {
             }
         });
 
+        agentSocket.on("createStackFile", async (stackName: unknown, relativePath: unknown, callback) => {
+            try {
+                checkLogin(socket);
+                const manager = await this.getFileManager(server, stackName);
+                const file = await manager.createFile(this.validatePath(relativePath));
+                callbackResult({
+                    ok: true,
+                    msg: "Created",
+                    msgi18n: true,
+                    file,
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
         agentSocket.on("writeStackFile", async (stackName: unknown, relativePath: unknown, content: unknown, version: unknown, callback) => {
             try {
                 checkLogin(socket);

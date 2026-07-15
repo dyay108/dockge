@@ -1,17 +1,50 @@
 <template>
     <section class="shadow-box big-padding mb-3 stack-file-browser">
-        <nav :aria-label="$t('currentDirectory')" class="file-breadcrumb mb-3">
-            <button class="breadcrumb-part" type="button" @click="openDirectory('')">
-                <font-awesome-icon icon="folder-open" class="me-1" />
-                {{ stackName }}
-            </button>
-            <template v-for="breadcrumb in breadcrumbs" :key="breadcrumb.path">
-                <span class="breadcrumb-separator">/</span>
-                <button class="breadcrumb-part" type="button" @click="openDirectory(breadcrumb.path)">
-                    {{ breadcrumb.name }}
+        <div class="file-browser-header mb-3">
+            <nav :aria-label="$t('currentDirectory')" class="file-breadcrumb">
+                <button class="breadcrumb-part" type="button" @click="openDirectory('')">
+                    <font-awesome-icon icon="folder-open" class="me-1" />
+                    {{ stackName }}
                 </button>
-            </template>
-        </nav>
+                <template v-for="breadcrumb in breadcrumbs" :key="breadcrumb.path">
+                    <span class="breadcrumb-separator">/</span>
+                    <button class="breadcrumb-part" type="button" @click="openDirectory(breadcrumb.path)">
+                        {{ breadcrumb.name }}
+                    </button>
+                </template>
+            </nav>
+            <button
+                class="btn btn-normal btn-sm" type="button" :disabled="creatingFile || loadingDirectory"
+                @click="startCreatingFile"
+            >
+                <font-awesome-icon icon="plus" class="me-1" />
+                {{ $t("newFile") }}
+            </button>
+        </div>
+
+        <form v-if="showNewFileForm" class="new-file-form mb-3" @submit.prevent="createFile">
+            <label class="visually-hidden" for="new-stack-file-name">{{ $t("newFileName") }}</label>
+            <input
+                id="new-stack-file-name" ref="newFileNameInput" v-model="newFileName" class="form-control form-control-sm"
+                type="text" maxlength="255" autocomplete="off" :placeholder="$t('newFileName')" :disabled="creatingFile"
+                @keydown.esc="cancelCreatingFile"
+            />
+            <div class="new-file-actions">
+                <button class="btn btn-primary btn-sm" type="submit" :disabled="!isValidNewFileName || creatingFile">
+                    <font-awesome-icon v-if="creatingFile" icon="spinner" spin class="me-1" />
+                    {{ $t("Create") }}
+                </button>
+                <button class="btn btn-normal btn-sm" type="button" :disabled="creatingFile" @click="cancelCreatingFile">
+                    {{ $t("cancel") }}
+                </button>
+            </div>
+            <small v-if="newFileName && !isValidNewFileName" class="text-danger new-file-feedback">
+                {{ $t("invalidFileName") }}
+            </small>
+            <small v-else class="text-muted new-file-feedback">
+                {{ $t("newFileDirectory", { directory: currentDirectory || stackName }) }}
+            </small>
+        </form>
 
         <div class="row g-0 browser-content">
             <div class="col-md-4 col-lg-3 file-list-pane">
@@ -117,6 +150,9 @@ export default {
             loadingDirectory: false,
             loadingFile: false,
             saving: false,
+            showNewFileForm: false,
+            newFileName: "",
+            creatingFile: false,
         };
     },
     computed: {
@@ -144,6 +180,26 @@ export default {
             const separatorIndex = this.currentDirectory.lastIndexOf("/");
             return separatorIndex === -1 ? "" : this.currentDirectory.slice(0, separatorIndex);
         },
+        trimmedNewFileName() {
+            return this.newFileName.trim();
+        },
+        isValidNewFileName() {
+            const fileName = this.trimmedNewFileName;
+            return fileName.length > 0
+                && fileName.length <= 255
+                && fileName !== "."
+                && fileName !== ".."
+                && !/[\\/]/.test(fileName)
+                && !Array.from(fileName).some(character => {
+                    const characterCode = character.charCodeAt(0);
+                    return characterCode < 32 || characterCode === 127;
+                });
+        },
+        newFilePath() {
+            return this.currentDirectory
+                ? `${this.currentDirectory}/${this.trimmedNewFileName}`
+                : this.trimmedNewFileName;
+        },
     },
     watch: {
         isDirty(isDirty) {
@@ -166,6 +222,7 @@ export default {
             if (!this.confirmDiscardChanges()) {
                 return;
             }
+            this.cancelCreatingFile();
             this.selectedFile = null;
             this.fileContent = "";
             this.originalContent = "";
@@ -192,6 +249,7 @@ export default {
             if (!discardConfirmed && !this.confirmDiscardChanges()) {
                 return;
             }
+            this.cancelCreatingFile();
             this.loadingFile = true;
             this.$root.emitAgent(this.endpoint, "readStackFile", this.stackName, relativePath, (res) => {
                 this.loadingFile = false;
@@ -245,6 +303,48 @@ export default {
             );
         },
 
+        startCreatingFile() {
+            this.showNewFileForm = true;
+            this.newFileName = "";
+            this.$nextTick(() => this.$refs.newFileNameInput?.focus());
+        },
+
+        cancelCreatingFile() {
+            if (this.creatingFile) {
+                return;
+            }
+            this.showNewFileForm = false;
+            this.newFileName = "";
+        },
+
+        createFile() {
+            if (!this.isValidNewFileName || this.creatingFile || !this.confirmDiscardChanges()) {
+                return;
+            }
+
+            this.creatingFile = true;
+            this.$root.emitAgent(this.endpoint, "createStackFile", this.stackName, this.newFilePath, (res) => {
+                this.creatingFile = false;
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.selectedFile = {
+                        ...res.file,
+                        path: this.toBrowserPath(res.file.path),
+                    };
+                    this.originalContent = res.file.content;
+                    this.fileContent = res.file.content;
+                    this.showNewFileForm = false;
+                    this.newFileName = "";
+                    this.$emit("saved", this.selectedFile.path);
+                    this.loadDirectory(this.currentDirectory);
+                    this.$nextTick(() => {
+                        const editor = this.$refs.fileEditor;
+                        (editor?.view?.value ?? editor?.view)?.focus();
+                    });
+                }
+            });
+        },
+
         openFindReplace() {
             const editor = this.$refs.fileEditor;
             openEditorSearch(editor?.view?.value ?? editor?.view);
@@ -279,12 +379,44 @@ export default {
     overflow: hidden;
 }
 
+.file-browser-header {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+}
+
 .file-breadcrumb {
     display: flex;
     align-items: center;
+    flex: 1 1 240px;
     min-height: 24px;
+    min-width: 0;
     overflow-x: auto;
     white-space: nowrap;
+}
+
+.new-file-form {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .form-control {
+        flex: 1 1 240px;
+        min-width: 0;
+    }
+}
+
+.new-file-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+}
+
+.new-file-feedback {
+    flex: 1 0 100%;
 }
 
 .breadcrumb-part {

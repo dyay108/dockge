@@ -106,6 +106,36 @@ export class StackFileManager {
         return this.fileContentResult(relativePath, file.content, resolvedPath.stat, this.fileVersion(file.buffer));
     }
 
+    async createFile(relativePath: string): Promise<StackFileContent> {
+        const normalizedPath = this.normalizeRelativePath(relativePath);
+        if (!normalizedPath) {
+            throw new ValidationError("File name is required.");
+        }
+
+        const parentPath = path.dirname(normalizedPath);
+        const resolvedParent = await this.resolveExistingPath(parentPath === "." ? "" : parentPath);
+        if (!resolvedParent.stat.isDirectory()) {
+            throw new ValidationError("The file's parent path is not a directory.");
+        }
+
+        const rootPath = await fs.realpath(this.stackPath);
+        const targetPath = path.join(resolvedParent.targetPath, path.basename(normalizedPath));
+        this.assertContainedPath(rootPath, targetPath);
+
+        try {
+            const fileHandle = await fs.open(targetPath, "wx", 0o644);
+            await fileHandle.close();
+        } catch (e) {
+            if ((e as NodeJS.ErrnoException).code === "EEXIST") {
+                throw new ValidationError("A file with this name already exists.");
+            }
+            throw e;
+        }
+
+        const stat = await fs.stat(targetPath);
+        return this.fileContentResult(normalizedPath, "", stat, this.fileVersion(Buffer.alloc(0)));
+    }
+
     async writeFile(relativePath: string, content: string, expectedVersion: string): Promise<StackFileContent> {
         if (typeof content !== "string") {
             throw new ValidationError("File content must be a string.");
