@@ -55,6 +55,10 @@
                             <span class="text-muted small">{{ formatFileSize(selectedFile.size) }}</span>
                         </div>
                         <div class="d-flex gap-2">
+                            <button class="btn btn-normal btn-sm" type="button" :disabled="saving" @click="openFindReplace">
+                                <font-awesome-icon icon="search" class="me-1" />
+                                {{ $t("findReplace") }}
+                            </button>
                             <button class="btn btn-normal btn-sm" type="button" :disabled="saving" @click="reloadFile">
                                 {{ $t("reloadFile") }}
                             </button>
@@ -67,7 +71,7 @@
                     </div>
                     <div class="file-editor">
                         <code-mirror
-                            v-model="fileContent" :extensions="extensions" minimal wrap="true" dark="true" tab="true"
+                            ref="fileEditor" v-model="fileContent" :extensions="editorExtensions" minimal wrap="true" dark="true" tab="true"
                             :disabled="saving"
                         />
                     </div>
@@ -85,6 +89,7 @@
 import CodeMirror from "vue-codemirror6";
 import { lineNumbers } from "@codemirror/view";
 import { dracula as editorTheme } from "thememirror";
+import { createFileEditorExtensions, openEditorSearch } from "../compose-editor";
 
 export default {
     name: "StackFileBrowser",
@@ -102,11 +107,6 @@ export default {
         },
     },
     emits: [ "dirty-change", "saved" ],
-    setup() {
-        return {
-            extensions: [ editorTheme, lineNumbers() ],
-        };
-    },
     data() {
         return {
             currentDirectory: "",
@@ -120,6 +120,13 @@ export default {
         };
     },
     computed: {
+        editorExtensions() {
+            return [
+                editorTheme,
+                lineNumbers(),
+                ...createFileEditorExtensions(this.selectedFile?.path ?? ""),
+            ];
+        },
         isDirty() {
             return this.selectedFile !== null && this.fileContent !== this.originalContent;
         },
@@ -236,6 +243,11 @@ export default {
                     }
                 }
             );
+        },
+
+        openFindReplace() {
+            const editor = this.$refs.fileEditor;
+            openEditorSearch(editor?.view?.value ?? editor?.view);
         },
 
         confirmDiscardChanges() {

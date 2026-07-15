@@ -125,6 +125,7 @@
     "stackFiles": "Files",
     "workspace": "Workspace",
     "editorViewDescription": "Switch between the Compose editor and project file workspace.",
+    "findReplace": "Find / Replace",
     "currentDirectory": "Current directory",
     "parentDirectory": "Parent directory",
     "emptyDirectory": "This directory is empty.",

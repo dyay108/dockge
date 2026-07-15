@@ -167,22 +167,31 @@
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
                         <h4 class="mb-0">{{ showFileBrowser ? $t("stackFiles") : stack.composeFileName }}</h4>
-                        <div
-                            v-if="!isAdd && !isEditMode" class="editor-view-toggle"
-                            :title="$t('editorViewDescription')"
-                        >
-                            <label class="form-check-label" for="editor-view-toggle">
-                                {{ $t("workspace") }}
-                                <span v-if="fileBrowserDirty" class="unsaved-indicator" aria-hidden="true"></span>
-                            </label>
-                            <div class="form-check form-switch m-0">
-                                <input
-                                    id="editor-view-toggle" class="form-check-input" type="checkbox" role="switch"
-                                    :checked="showFileBrowser" :aria-label="$t('editorViewDescription')"
-                                    @change="toggleFileBrowser"
-                                />
+                        <div class="editor-heading-actions">
+                            <button
+                                v-if="!showFileBrowser" class="btn btn-normal btn-sm" type="button"
+                                :title="$t('findReplace')" @click="openComposeSearch"
+                            >
+                                <font-awesome-icon icon="search" class="me-1" />
+                                {{ $t("findReplace") }}
+                            </button>
+                            <div
+                                v-if="!isAdd && !isEditMode" class="editor-view-toggle"
+                                :title="$t('editorViewDescription')"
+                            >
+                                <label class="form-check-label" for="editor-view-toggle">
+                                    {{ $t("workspace") }}
+                                    <span v-if="fileBrowserDirty" class="unsaved-indicator" aria-hidden="true"></span>
+                                </label>
+                                <div class="form-check form-switch m-0">
+                                    <input
+                                        id="editor-view-toggle" class="form-check-input" type="checkbox" role="switch"
+                                        :checked="showFileBrowser" :aria-label="$t('editorViewDescription')"
+                                        @change="toggleFileBrowser"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -196,13 +205,14 @@
                         <!-- YAML editor -->
                         <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
                             <code-mirror
-                                ref="editor"
+                                ref="composeEditor"
                                 v-model="stack.composeYAML"
                                 :extensions="extensions"
                                 minimal
                                 wrap="true"
                                 dark="true"
                                 tab="true"
+                                :readonly="!isEditMode"
                                 :disabled="!isEditMode"
                                 :hasFocus="editorFocus"
                                 @change="yamlCodeChange"
@@ -217,7 +227,7 @@
                             <h4 class="mb-3">.env</h4>
                             <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
                                 <code-mirror
-                                    ref="editor"
+                                    ref="envEditor"
                                     v-model="stack.composeENV"
                                     :extensions="extensionsEnv"
                                     minimal
@@ -272,11 +282,11 @@
 
 <script>
 import CodeMirror from "vue-codemirror6";
-import { yaml } from "@codemirror/lang-yaml";
 import { python } from "@codemirror/lang-python";
 import { dracula as editorTheme } from "thememirror";
 import { lineNumbers, EditorView } from "@codemirror/view";
 import { parseDocument, Document } from "yaml";
+import { createTextEditorExtensions, createYamlEditorExtensions, openEditorSearch } from "../compose-editor";
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import {
@@ -333,8 +343,8 @@ export default {
 
         const extensions = [
             editorTheme,
-            yaml(),
             lineNumbers(),
+            ...createYamlEditorExtensions(true),
             EditorView.focusChangeEffect.of(focusEffectHandler)
         ];
 
@@ -342,6 +352,7 @@ export default {
             editorTheme,
             python(),
             lineNumbers(),
+            ...createTextEditorExtensions(),
             EditorView.focusChangeEffect.of(focusEffectHandler)
         ];
 
@@ -816,6 +827,11 @@ export default {
             }
         },
 
+        openComposeSearch() {
+            const editor = this.$refs.composeEditor;
+            openEditorSearch(editor?.view?.value ?? editor?.view);
+        },
+
         onStackFileSaved(relativePath) {
             if (relativePath === this.stack.composeFileName || relativePath === ".env") {
                 this.loadStack();
@@ -918,6 +934,13 @@ export default {
     display: flex;
     flex: 0 0 auto;
     gap: 8px;
+}
+
+.editor-heading-actions {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 12px;
 }
 
 .unsaved-indicator {
