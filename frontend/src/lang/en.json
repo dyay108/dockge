@@ -112,6 +112,7 @@
     "agentOnline": "Online",
     "agentOffline": "Offline",
     "connecting": "Connecting",
+    "connected": "Connected",
     "connect": "Connect",
     "addAgent": "Add Agent",
     "agentAddedSuccessfully": "Agent added successfully.",

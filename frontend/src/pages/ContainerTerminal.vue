@@ -1,27 +1,34 @@
 <template>
     <transition name="slide-fade" appear>
         <div>
-            <h1 class="mb-3">{{ $t("terminal") }} - {{ serviceName }} ({{ stackName }})</h1>
-
             <div class="mb-3">
-                <router-link :to="sh" class="btn btn-normal me-2">{{ $t("Switch to sh") }}</router-link>
+                <router-link :to="stackRoute" class="btn btn-normal btn-sm">
+                    <font-awesome-icon icon="arrow-left" class="me-1" />
+                    {{ stackName }}
+                </router-link>
             </div>
 
-            <Terminal class="terminal" :rows="20" mode="interactive" :name="terminalName" :stack-name="stackName" :service-name="serviceName" :shell="shell" :endpoint="endpoint"></Terminal>
+            <h1 class="mb-3">{{ $t("terminal") }}</h1>
+
+            <ContainerShell
+                :stack-name="stackName"
+                :service-name="serviceName"
+                :endpoint="endpoint"
+                :shell="shell"
+                @update:shell="switchShell"
+            />
         </div>
     </transition>
 </template>
 
 <script>
-import { getContainerExecTerminalName } from "../../../common/util-common";
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import ContainerShell from "../components/ContainerShell.vue";
 
 export default {
     components: {
-    },
-    data() {
-        return {
-
-        };
+        ContainerShell,
+        FontAwesomeIcon,
     },
     computed: {
         stackName() {
@@ -36,40 +43,31 @@ export default {
         serviceName() {
             return this.$route.params.serviceName;
         },
-        terminalName() {
-            return getContainerExecTerminalName(this.endpoint, this.stackName, this.serviceName, 0);
+        stackRoute() {
+            if (this.endpoint) {
+                return `/compose/${this.stackName}/${this.endpoint}`;
+            }
+            return `/compose/${this.stackName}`;
         },
-        sh() {
-            let endpoint = this.$route.params.endpoint;
-
+    },
+    methods: {
+        switchShell(shell) {
             let data = {
                 name: "containerTerminal",
                 params: {
                     stackName: this.stackName,
                     serviceName: this.serviceName,
-                    type: "sh",
+                    type: shell,
                 },
             };
 
-            if (endpoint) {
+            if (this.endpoint) {
                 data.name = "containerTerminalEndpoint";
-                data.params.endpoint = endpoint;
+                data.params.endpoint = this.endpoint;
             }
 
-            return data;
+            this.$router.replace(data);
         },
-    },
-    mounted() {
-
-    },
-    methods: {
-
     }
 };
 </script>
-
-<style scoped lang="scss">
-.terminal {
-    height: 410px;
-}
-</style>

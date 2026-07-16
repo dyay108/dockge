@@ -298,26 +298,16 @@
             <BModal v-model="showDeleteDialog" :cancelTitle="$t('cancel')" :okTitle="$t('deleteStack')" okVariant="danger" @ok="deleteDialog">
                 {{ $t("deleteStackMsg") }}
             </BModal>
-            <div v-if="terminalServiceName" v-show="activeStackTab === 'terminal'" class="container-shell-view">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-                    <h4 class="mb-0">{{ $t("terminal") }} — {{ terminalServiceName }}</h4>
-                    <button v-if="containerShell !== 'sh'" class="btn btn-normal btn-sm" type="button" @click="switchContainerShell('sh')">
-                        {{ $t("Switch to sh") }}
-                    </button>
-                </div>
-                <Terminal
-                    :key="containerTerminalKey"
-                    ref="containerTerminal"
-                    class="container-shell-terminal"
-                    :rows="20"
-                    mode="interactive"
-                    :name="containerTerminalName"
-                    :stack-name="stack.name"
-                    :service-name="terminalServiceName"
-                    :shell="containerShell"
-                    :endpoint="endpoint"
-                ></Terminal>
-            </div>
+            <ContainerShell
+                v-if="terminalServiceName"
+                v-show="activeStackTab === 'terminal'"
+                ref="containerTerminal"
+                v-model:shell="containerShell"
+                class="mb-3"
+                :stack-name="stack.name"
+                :service-name="terminalServiceName"
+                :endpoint="endpoint"
+            />
         </div>
     </transition>
 </template>
@@ -337,11 +327,11 @@ import {
     copyYAMLComments, envsubstYAML,
     getCombinedTerminalName,
     getComposeTerminalName,
-    getContainerExecTerminalName,
     PROGRESS_TERMINAL_ROWS,
     RUNNING
 } from "../../../common/util-common";
 import { BModal } from "bootstrap-vue-next";
+import ContainerShell from "../components/ContainerShell.vue";
 import NetworkInput from "../components/NetworkInput.vue";
 import StackFileBrowser from "../components/StackFileBrowser.vue";
 import dotenv from "dotenv";
@@ -364,6 +354,7 @@ let dockerStatsTimeout = null;
 
 export default {
     components: {
+        ContainerShell,
         NetworkInput,
         StackFileBrowser,
         FontAwesomeIcon,
@@ -499,17 +490,6 @@ export default {
             return getCombinedTerminalName(this.endpoint, this.stack.name);
         },
 
-        containerTerminalName() {
-            if (!this.stack.name || !this.terminalServiceName) {
-                return "";
-            }
-            return getContainerExecTerminalName(this.endpoint, this.stack.name, this.terminalServiceName, 0);
-        },
-
-        containerTerminalKey() {
-            return `${this.containerTerminalName}-${this.containerShell}`;
-        },
-
         networks() {
             return this.jsonConfig.networks;
         },
@@ -629,10 +609,6 @@ export default {
         showContainerTerminal() {
             this.activeStackTab = "terminal";
             this.resizeTerminal("containerTerminal");
-        },
-
-        switchContainerShell(shell) {
-            this.containerShell = shell;
         },
 
         resizeTerminal(refName) {
@@ -1001,10 +977,6 @@ export default {
 
 .terminal {
     height: 200px;
-}
-
-.container-shell-terminal {
-    height: 410px;
 }
 
 .stack-tabs .nav-link {
