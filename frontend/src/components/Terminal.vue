@@ -253,14 +253,10 @@ export default {
         },
 
         interactiveTerminalConfig() {
-            this.terminal.onKey(e => {
-                // Handle Ctrl+V for paste
-                if (e.key === "\u0016" || (e.domEvent?.ctrlKey && e.key.toLowerCase() === "v")) {
-                    this.handlePaste();
-                    return;
-                }
-
-                this.$root.emitAgent(this.endpoint, "terminalInput", this.name, e.key, (res) => {
+            // onData includes input from soft keyboards and IMEs, which do not
+            // necessarily produce the keyboard events exposed by onKey.
+            this.terminal.onData(data => {
+                this.$root.emitAgent(this.endpoint, "terminalInput", this.name, data, (res) => {
                     if (!res.ok) {
                         this.$root.toastRes(res);
                     }
