@@ -17,10 +17,10 @@
             <div class="col-7">
                 <div class="function">
                     <div class="btn-group me-2" role="group">
-                        <router-link v-if="!isEditMode && (status === 'running' || status === 'healthy')" class="btn btn-normal" :to="terminalRouteLink" disabled="">
+                        <button v-if="!isEditMode && (status === 'running' || status === 'healthy')" class="btn btn-normal" type="button" @click="openTerminal">
                             <font-awesome-icon icon="terminal" />
                             Bash
-                        </router-link>
+                        </button>
                         <button
                             v-if="serviceCount > 1 && !isEditMode && status !== 'running' && status !== 'healthy'"
                             class="btn btn-primary"
@@ -223,6 +223,7 @@ export default defineComponent({
         }
     },
     emits: [
+        "open-terminal",
         "start-service",
         "stop-service",
         "restart-service"
@@ -253,39 +254,8 @@ export default defineComponent({
             }
         },
 
-        terminalRouteLink() {
-            if (this.endpoint) {
-                return {
-                    name: "containerTerminalEndpoint",
-                    params: {
-                        endpoint: this.endpoint,
-                        stackName: this.stackName,
-                        serviceName: this.name,
-                        type: "bash",
-                    },
-                };
-            } else {
-                return {
-                    name: "containerTerminal",
-                    params: {
-                        stackName: this.stackName,
-                        serviceName: this.name,
-                        type: "bash",
-                    },
-                };
-            }
-        },
-
-        endpoint() {
-            return this.$parent.$parent.endpoint;
-        },
-
         stack() {
             return this.$parent.$parent.stack;
-        },
-
-        stackName() {
-            return this.$parent.$parent.stack.name;
         },
 
         service() {
@@ -358,6 +328,9 @@ export default defineComponent({
         }
     },
     methods: {
+        openTerminal() {
+            this.$emit("open-terminal", this.name);
+        },
         parsePort(port) {
             if (this.stack.endpoint) {
                 return parseDockerPort(port, this.stack.primaryHostname);

@@ -9,7 +9,28 @@
                 </span>
             </h1>
 
-            <div v-if="stack.isManagedByDockge" class="mb-3">
+            <ul v-if="terminalServiceName" class="nav nav-tabs stack-tabs mb-3" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button
+                        class="nav-link" :class="{ active: activeStackTab === 'stack' }" type="button" role="tab"
+                        :aria-selected="activeStackTab === 'stack'" @click="showStackView"
+                    >
+                        <font-awesome-icon icon="list" class="me-1" />
+                        {{ $t("stack") }}
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button
+                        class="nav-link" :class="{ active: activeStackTab === 'terminal' }" type="button" role="tab"
+                        :aria-selected="activeStackTab === 'terminal'" @click="showContainerTerminal"
+                    >
+                        <font-awesome-icon icon="terminal" class="me-1" />
+                        {{ terminalServiceName }}
+                    </button>
+                </li>
+            </ul>
+
+            <div v-if="stack.isManagedByDockge" v-show="activeStackTab === 'stack'" class="mb-3">
                 <div class="btn-group me-2" role="group">
                     <button v-if="isEditMode" class="btn btn-primary" :disabled="processing" @click="deployStack">
                         <font-awesome-icon icon="rocket" class="me-1" />
@@ -62,7 +83,7 @@
             </div>
 
             <!-- URLs -->
-            <div v-if="urls.length > 0" class="mb-3">
+            <div v-if="urls.length > 0" v-show="activeStackTab === 'stack'" class="mb-3">
                 <a v-for="(urlItem, index) in urls" :key="index" target="_blank" :href="urlItem.url">
                     <span class="badge bg-secondary me-2">{{ urlItem.display }}</span>
                 </a>
@@ -71,7 +92,7 @@
             <!-- Progress Terminal -->
             <transition name="slide-fade" appear>
                 <Terminal
-                    v-show="showProgressTerminal"
+                    v-show="activeStackTab === 'stack' && showProgressTerminal"
                     ref="progressTerminal"
                     class="mb-3 terminal"
                     :name="terminalName"
@@ -81,7 +102,7 @@
                 ></Terminal>
             </transition>
 
-            <div v-if="stack.isManagedByDockge" class="row">
+            <div v-if="stack.isManagedByDockge" v-show="activeStackTab === 'stack'" class="row">
                 <div class="col-lg-6">
                     <!-- General -->
                     <div v-if="isAdd">
@@ -130,6 +151,7 @@
                             :first="name === Object.keys(jsonConfig.services)[0]"
                             :serviceStatus="serviceStatusList[name]"
                             :dockerStats="dockerStats"
+                            @open-terminal="openContainerTerminal"
                             @start-service="startService"
                             @stop-service="stopService"
                             @restart-service="restartService"
@@ -268,7 +290,7 @@
                 </div>
             </div>
 
-            <div v-if="!stack.isManagedByDockge && !processing">
+            <div v-if="activeStackTab === 'stack' && !stack.isManagedByDockge && !processing">
                 {{ $t("stackNotManagedByDockgeMsg") }}
             </div>
 
@@ -276,6 +298,26 @@
             <BModal v-model="showDeleteDialog" :cancelTitle="$t('cancel')" :okTitle="$t('deleteStack')" okVariant="danger" @ok="deleteDialog">
                 {{ $t("deleteStackMsg") }}
             </BModal>
+            <div v-if="terminalServiceName" v-show="activeStackTab === 'terminal'" class="container-shell-view">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                    <h4 class="mb-0">{{ $t("terminal") }} — {{ terminalServiceName }}</h4>
+                    <button v-if="containerShell !== 'sh'" class="btn btn-normal btn-sm" type="button" @click="switchContainerShell('sh')">
+                        {{ $t("Switch to sh") }}
+                    </button>
+                </div>
+                <Terminal
+                    :key="containerTerminalKey"
+                    ref="containerTerminal"
+                    class="container-shell-terminal"
+                    :rows="20"
+                    mode="interactive"
+                    :name="containerTerminalName"
+                    :stack-name="stack.name"
+                    :service-name="terminalServiceName"
+                    :shell="containerShell"
+                    :endpoint="endpoint"
+                ></Terminal>
+            </div>
         </div>
     </transition>
 </template>
@@ -295,6 +337,7 @@ import {
     copyYAMLComments, envsubstYAML,
     getCombinedTerminalName,
     getComposeTerminalName,
+    getContainerExecTerminalName,
     PROGRESS_TERMINAL_ROWS,
     RUNNING
 } from "../../../common/util-common";
@@ -382,6 +425,9 @@ export default {
             fileBrowserOpened: false,
             showFileBrowser: false,
             fileBrowserDirty: false,
+            activeStackTab: "stack",
+            terminalServiceName: "",
+            containerShell: "bash",
             newContainerName: "",
             stopServiceStatusTimeout: false,
             stopDockerStatsTimeout: false,
@@ -451,6 +497,17 @@ export default {
                 return "";
             }
             return getCombinedTerminalName(this.endpoint, this.stack.name);
+        },
+
+        containerTerminalName() {
+            if (!this.stack.name || !this.terminalServiceName) {
+                return "";
+            }
+            return getContainerExecTerminalName(this.endpoint, this.stack.name, this.terminalServiceName, 0);
+        },
+
+        containerTerminalKey() {
+            return `${this.containerTerminalName}-${this.containerShell}`;
         },
 
         networks() {
@@ -557,6 +614,33 @@ export default {
 
     },
     methods: {
+        openContainerTerminal(serviceName) {
+            this.terminalServiceName = serviceName;
+            this.containerShell = "bash";
+            this.activeStackTab = "terminal";
+            this.resizeTerminal("containerTerminal");
+        },
+
+        showStackView() {
+            this.activeStackTab = "stack";
+            this.resizeTerminal("combinedTerminal");
+        },
+
+        showContainerTerminal() {
+            this.activeStackTab = "terminal";
+            this.resizeTerminal("containerTerminal");
+        },
+
+        switchContainerShell(shell) {
+            this.containerShell = shell;
+        },
+
+        resizeTerminal(refName) {
+            this.$nextTick(() => {
+                this.$refs[refName]?.updateTerminalSize();
+            });
+        },
+
         startServiceStatusTimeout() {
             clearTimeout(serviceStatusTimeout);
             serviceStatusTimeout = setTimeout(async () => {
@@ -917,6 +1001,14 @@ export default {
 
 .terminal {
     height: 200px;
+}
+
+.container-shell-terminal {
+    height: 410px;
+}
+
+.stack-tabs .nav-link {
+    color: inherit;
 }
 
 .editor-box {
