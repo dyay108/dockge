@@ -9,26 +9,33 @@
                 </span>
             </h1>
 
-            <ul v-if="terminalServiceName" class="nav nav-tabs stack-tabs mb-3" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button
-                        class="nav-link" :class="{ active: activeStackTab === 'stack' }" type="button" role="tab"
-                        :aria-selected="activeStackTab === 'stack'" @click="showStackView"
-                    >
-                        <font-awesome-icon icon="list" class="me-1" />
-                        {{ $t("stack") }}
+            <div v-if="terminalServiceName" class="view-switcher mb-3" role="tablist">
+                <button
+                    type="button" class="switch-item" role="tab"
+                    :class="{ active: activeStackTab === 'stack' }"
+                    :aria-selected="activeStackTab === 'stack'" @click="showStackView"
+                >
+                    <font-awesome-icon icon="list" />
+                    <span class="switch-text">{{ $t("stack") }}</span>
+                </button>
+                <div
+                    class="switch-item switch-item-closable" role="tab"
+                    :class="{ active: activeStackTab === 'terminal' }"
+                    :aria-selected="activeStackTab === 'terminal'"
+                >
+                    <button type="button" class="switch-label" @click="showContainerTerminal">
+                        <font-awesome-icon icon="terminal" />
+                        <span class="switch-text">{{ terminalServiceName }}</span>
                     </button>
-                </li>
-                <li class="nav-item" role="presentation">
                     <button
-                        class="nav-link" :class="{ active: activeStackTab === 'terminal' }" type="button" role="tab"
-                        :aria-selected="activeStackTab === 'terminal'" @click="showContainerTerminal"
+                        type="button" class="switch-close"
+                        :title="$t('close')" :aria-label="$t('close')"
+                        @click="closeContainerTerminal"
                     >
-                        <font-awesome-icon icon="terminal" class="me-1" />
-                        {{ terminalServiceName }}
+                        <font-awesome-icon icon="times" />
                     </button>
-                </li>
-            </ul>
+                </div>
+            </div>
 
             <div v-if="stack.isManagedByDockge" v-show="activeStackTab === 'stack'" class="mb-3">
                 <div class="btn-group me-2" role="group">
@@ -611,6 +618,11 @@ export default {
             this.resizeTerminal("containerTerminal");
         },
 
+        closeContainerTerminal() {
+            this.terminalServiceName = "";
+            this.showStackView();
+        },
+
         resizeTerminal(refName) {
             this.$nextTick(() => {
                 this.$refs[refName]?.updateTerminalSize();
@@ -979,8 +991,88 @@ export default {
     height: 200px;
 }
 
-.stack-tabs .nav-link {
+.view-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 4px;
+    border-radius: 50rem;
+    background-color: #f5f5f5;
+
+    .dark & {
+        background-color: $dark-header-bg;
+    }
+}
+
+.switch-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 6px 16px;
+    border: 0;
+    border-radius: 50rem;
+    background: transparent;
     color: inherit;
+    font-size: 14px;
+    transition: all ease-in-out 0.15s;
+
+    &:hover:not(.active) {
+        background-color: rgba(0, 0, 0, 0.06);
+
+        .dark & {
+            background-color: rgba(255, 255, 255, 0.06);
+        }
+    }
+
+    &.active {
+        background: $primary-gradient;
+        color: white;
+
+        .dark & {
+            color: $dark-font-color2;
+        }
+    }
+
+    .switch-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.switch-item-closable {
+    padding: 0;
+
+    .switch-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        padding: 6px 4px 6px 16px;
+        border: 0;
+        border-radius: 50rem 0 0 50rem;
+        background: transparent;
+        color: inherit;
+    }
+
+    .switch-close {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px 6px 6px;
+        border: 0;
+        border-radius: 0 50rem 50rem 0;
+        background: transparent;
+        color: inherit;
+        font-size: 12px;
+        opacity: 0.6;
+        transition: opacity ease-in-out 0.15s;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
 }
 
 .editor-box {
